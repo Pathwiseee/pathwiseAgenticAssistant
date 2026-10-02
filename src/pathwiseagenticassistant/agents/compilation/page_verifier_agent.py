@@ -1,0 +1,1 @@
+# Checks the page has every required section, renders, and has no unsafe script
