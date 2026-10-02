@@ -1,3 +1,9 @@
-# Summarises each kept article into key points
+from pydantic import BaseModel, Field
+from agents import Agent
 
-# CONVERT TO TOOL?
+# Overview Description: Summarises each kept article into key points
+# Used mainly by research
+
+#Input:
+#Output: 
+# Structured input/output
