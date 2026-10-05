@@ -4,32 +4,9 @@ from agents import Runner, trace
 from pathwiseagenticassistant.agents.research.topic_planning_agent import topic_planning_agent
 from pathwiseagenticassistant.agents.research.relevance_judge import relevance_judge_agent, MIN_RELEVANCE_SCORE
 from pathwiseagenticassistant.agents.research.critic_agent import critic_agent
+from pathwiseagenticassistant.schemas import ArticleSummary, ResearchPack
 
 MAX_ARTICLES = 6
-
-
-# ---------- Data ----------
-
-class LearningRequest(BaseModel):      # TEMPORARY until John's is ready
-    topic: str
-    user_level: str
-    tech_stack: str
-    goal: str
-
-
-class ArticleSummary(BaseModel):
-    title: str
-    url: str
-    key_points: list[str]
-    subtopics_covered: list[str]
-
-
-class ResearchPack(BaseModel):
-    topic: str
-    summaries: list[ArticleSummary]
-    gaps: list[str]
-
-
 # ---------- The manager ----------
 
 class ResearchManager:

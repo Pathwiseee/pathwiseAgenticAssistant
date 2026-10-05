@@ -9,6 +9,7 @@ from pathwiseagenticassistant.agents.compilation.lesson_reviewer_agent import Le
 from pathwiseagenticassistant.agents.compilation.lesson_writing_agent import write_lesson
 from pathwiseagenticassistant.agents.compilation.page_verifier_agent import PageVerification, verify_page
 from pathwiseagenticassistant.agents.compilation.ui_component import UIComponent
+from pathwiseagenticassistant.schemas import CompilationEvent, CompiledLesson
 
 # Overview Description: Runs the compilation module end to end for one lesson
 #
@@ -26,23 +27,6 @@ from pathwiseagenticassistant.agents.compilation.ui_component import UIComponent
 #Input: topic, lesson resources (from the research module)
 #Output: stream of CompilationEvents, the last one carrying the CompiledLesson
 
-
-class CompiledLesson(BaseModel):
-    topic: str
-    lesson_plan: str
-    reviews: list[LessonReview] = Field(default_factory=list)
-    lesson: UIComponent
-    verifications: list[PageVerification] = Field(default_factory=list)
-
-    @property
-    def verified(self) -> bool:
-        return bool(self.verifications) and self.verifications[-1].passed
-
-
-class CompilationEvent(BaseModel):
-    stage: Literal["planning", "reviewing", "writing", "verifying", "done"]
-    message: str
-    result: CompiledLesson | None = None  # only set on the "done" event
 
 
 async def compile_lesson_stream(

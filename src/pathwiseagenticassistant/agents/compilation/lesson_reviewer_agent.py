@@ -1,5 +1,6 @@
-from pydantic import BaseModel, Field
-from agents import Agent, Runner, trace
+from agents import Agent, Runner
+
+from pathwiseagenticassistant.schemas import LessonReview
 
 # Overview Description: Sets learning goals, preconditions and postconditions for one step
 
@@ -38,15 +39,6 @@ Instructions = """
       Leave empty if there are none. Most reasonable plans should have none.
     - suggestions: systematic, non-blocking notes following the structure of the plan.
     """
-
-
-class LessonReview(BaseModel):
-    blocking_issues: list[str] = Field(description="Problems that make the lesson wrong or unlearnable; usually empty")
-    suggestions: str = Field(description="Non-blocking notes following the structure of the plan")
-
-    @property
-    def approved(self) -> bool:
-        return not self.blocking_issues
 
 
 lesson_reviewer_agent = Agent(

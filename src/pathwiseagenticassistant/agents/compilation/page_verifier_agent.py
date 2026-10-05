@@ -1,10 +1,10 @@
 import re
 
 import gradio as gr
-from pydantic import BaseModel, Field
 from agents import Agent, Runner
 
 from pathwiseagenticassistant.agents.compilation.ui_component import CONTAINER_TYPES, UIComponent
+from pathwiseagenticassistant.schemas import PageReview, PageVerification
 from pathwiseagenticassistant.ui.components import render
 
 # Overview Description: Checks the page has every required section, renders, and has no unsafe script
@@ -38,33 +38,6 @@ Instructions = """
       Leave empty if there are none.
     - suggestions: non-blocking edits for the lesson writer: where in the lesson to add or rephrase, and what.
     """
-
-
-class PageReview(BaseModel):
-    blocking_gaps: list[str] = Field(description="Core goals missing entirely or taught incorrectly; usually empty")
-    suggestions: str = Field(description="Non-blocking add/rephrase edits for the lesson writer")
-
-    @property
-    def passed(self) -> bool:
-        return not self.blocking_gaps
-
-
-class PageVerification(BaseModel):
-    structural_issues: list[str]
-    review: PageReview | None  # None when structural checks failed and the LLM review was skipped
-
-    @property
-    def passed(self) -> bool:
-        return not self.structural_issues and self.review is not None and self.review.passed
-
-    # Only blocking problems go back to the writer; suggestions would grow the lesson every revision
-    def feedback(self) -> str:
-        parts = []
-        if self.structural_issues:
-            parts.append("Structural issues:\n" + "\n".join(f"- {i}" for i in self.structural_issues))
-        if self.review is not None and self.review.blocking_gaps:
-            parts.append("Blocking gaps:\n" + "\n".join(f"- {g}" for g in self.review.blocking_gaps))
-        return "\n\n".join(parts)
 
 
 page_verifier_agent = Agent(
