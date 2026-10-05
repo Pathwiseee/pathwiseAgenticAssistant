@@ -1,5 +1,9 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
 from enum import Enum
+
+from pathwiseagenticassistant.agents.compilation.ui_component import UIComponent
 
 
 # INTAKE 
@@ -22,8 +26,6 @@ class LearningRequest(BaseModel):
     level: LevelEnum = Field(description="User's current knowledge level")
     tech_stack: str = Field(description="User's primary tech stack (e.g., 'Java/Spring', 'Python/Django')")
     goal: str = Field(description="Learning purpose: job, project, exam, or general knowledge")
-    format: str = Field(default="html", description="Preferred output format: html, markdown, or components")
-    route: RouteEnum = Field(description="Where to route: 'research' for new topic, 'tutor' for lesson question")
 
 
 # Research
@@ -72,25 +74,6 @@ class SearchResults(BaseModel):
 # Compilation
 
 
-class CompiledLesson(BaseModel):
-    topic: str
-    lesson_plan: str
-    reviews: list[LessonReview] = Field(default_factory=list)
-    lesson: UIComponent
-    verifications: list[PageVerification] = Field(default_factory=list)
-
-    @property
-    def verified(self) -> bool:
-        return bool(self.verifications) and self.verifications[-1].passed
-
-
-class CompilationEvent(BaseModel):
-    stage: Literal["planning", "reviewing", "writing", "verifying", "done"]
-    message: str
-    result: CompiledLesson | None = None  # only set on the "done" event
-
-
-
 class LessonReview(BaseModel):
     blocking_issues: list[str] = Field(description="Problems that make the lesson wrong or unlearnable; usually empty")
     suggestions: str = Field(description="Non-blocking notes following the structure of the plan")
@@ -98,7 +81,6 @@ class LessonReview(BaseModel):
     @property
     def approved(self) -> bool:
         return not self.blocking_issues
-
 
 class PageReview(BaseModel):
     blocking_gaps: list[str] = Field(description="Core goals missing entirely or taught incorrectly; usually empty")
@@ -125,3 +107,22 @@ class PageVerification(BaseModel):
         if self.review is not None and self.review.blocking_gaps:
             parts.append("Blocking gaps:\n" + "\n".join(f"- {g}" for g in self.review.blocking_gaps))
         return "\n\n".join(parts)
+
+class CompiledLesson(BaseModel):
+    research_pack: ResearchPack
+    reviews: list[LessonReview] = Field(default_factory=list)
+    lesson: UIComponent
+    verifications: list[PageVerification] = Field(default_factory=list)
+
+    @property
+    def verified(self) -> bool:
+        return bool(self.verifications) and self.verifications[-1].passed
+
+
+class CompilationEvent(BaseModel):
+    stage: Literal["planning", "reviewing", "writing", "verifying", "done"]
+    message: str
+    result: CompiledLesson | None = None  # only set on the "done" event
+
+
+
