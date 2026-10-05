@@ -21,6 +21,7 @@ Instructions = """
     - topic, the topic the user is trying to learn
     - lesson_resources, which includes for each resource, a topic, a link, a rating for how high-quality the source is, and a summary of the resource,
     - lesson_plan, if a lesson plan is given, modify the lesson plan.
+    - review_notes, if given, revise the lesson plan so every note is addressed.
 
     Output: 
     - an (Lesson_name)_outline.md with an intentional topology. Main Topic at the highest level, and subtopics below that. 
@@ -47,6 +48,16 @@ lesson_planning_agent = Agent(
     instructions=Instructions,
 )
 
-async def get_lesson_plan(topic: str, lesson_resources: str, lesson_plan: str):
-	result = await Runner.run(lesson_planning_agent, lesson_resources, topic, lesson_plan)
-	return result.final_output
+async def get_lesson_plan(
+    topic: str,
+    lesson_resources: str,
+    lesson_plan: str | None = None,
+    review_notes: str | None = None,
+) -> str:
+    prompt = f"Topic: {topic}\n\nLesson Resources:\n{lesson_resources}"
+    if lesson_plan:
+        prompt += f"\n\nLesson Plan:\n{lesson_plan}"
+    if review_notes:
+        prompt += f"\n\nReview Notes:\n{review_notes}"
+    result = await Runner.run(lesson_planning_agent, prompt)
+    return result.final_output
