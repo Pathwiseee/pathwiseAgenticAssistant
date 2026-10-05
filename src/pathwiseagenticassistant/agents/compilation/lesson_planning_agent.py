@@ -1,5 +1,7 @@
 from agents import Agent, Runner, trace
 
+from pathwiseagenticassistant.schemas import ResearchPack
+
 # Overview Description: Sets learning goals, preconditions and postconditions for one step
 
 #Input: 
@@ -49,12 +51,11 @@ lesson_planning_agent = Agent(
 )
 
 async def get_lesson_plan(
-    topic: str,
-    lesson_resources: str,
+    research_pack: ResearchPack,
     lesson_plan: str | None = None,
     review_notes: str | None = None,
 ) -> str:
-    prompt = f"Topic: {topic}\n\nLesson Resources:\n{lesson_resources}"
+    prompt = f"Topic: {research_pack.topic}\n\nLesson Resources:\n{research_pack.summaries}"
     if lesson_plan:
         prompt += f"\n\nLesson Plan:\n{lesson_plan}"
     if review_notes:
