@@ -54,7 +54,6 @@ class UserProfile(BaseModel):
 class Answer(BaseModel):
     """Grounded answer from Tutor Agent"""
     answer: str = Field(description="The tutor's answer, grounded in lesson sources")
-    citations: list[Citation] = Field(description="Sources used to answer the question")
     lesson_id: str = Field(description="ID of the lesson being tutored on")
 
 # Search Agent
