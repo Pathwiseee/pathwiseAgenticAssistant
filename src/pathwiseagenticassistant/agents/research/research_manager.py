@@ -1,10 +1,9 @@
-from pydantic import BaseModel
 from agents import Runner, trace
 
 from pathwiseagenticassistant.agents.research.topic_planning_agent import topic_planning_agent
 from pathwiseagenticassistant.agents.research.relevance_judge import relevance_judge_agent, MIN_RELEVANCE_SCORE
 from pathwiseagenticassistant.agents.research.critic_agent import critic_agent
-from pathwiseagenticassistant.schemas import ArticleSummary, ResearchPack
+from pathwiseagenticassistant.schemas import  ResearchPack
 
 MAX_ARTICLES = 6
 # ---------- The manager ----------
@@ -16,7 +15,7 @@ class ResearchManager:
         self.summarizer_agent = summarizer_agent
 
     async def run(self, request):
-        learner = f"topic: {request.topic}, level: {request.user_level}, stack: {request.tech_stack}, goal: {request.goal}"
+        learner = f"topic: {request.topic}, level: {request.level.value}, stack: {request.tech_stack}, goal: {request.goal}"
 
         with trace("Pathwise research"):
 
@@ -29,7 +28,7 @@ class ResearchManager:
             seen_urls = []
             for search in plan.searches:
                 result = await Runner.run(self.search_agent, search.query)
-                for article in result.final_output.articles:
+                for article in result.final_output.results:
                     if article.url not in seen_urls:
                         articles.append(article)
                         seen_urls.append(article.url)
@@ -48,7 +47,10 @@ class ResearchManager:
             for article in good_articles:
                 text = f"title: {article.title}\nurl: {article.url}\nsnippet: {article.snippet}"
                 result = await Runner.run(self.summarizer_agent, text)
-                summaries.append(ArticleSummary.model_validate(result.final_output.model_dump()))
+                summary=result.final_output
+                summary.title=article.title
+                summary.url=article.url
+                summaries.append(summary)
 
             # STEP 5: ask the critic what is missing
             notes = ""
