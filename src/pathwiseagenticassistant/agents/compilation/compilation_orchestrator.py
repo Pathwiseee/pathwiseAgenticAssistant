@@ -1,7 +1,4 @@
 from collections.abc import AsyncIterator
-from typing import Literal
-
-from pydantic import BaseModel, Field
 from agents import trace
 
 from pathwiseagenticassistant.agents.compilation.lesson_planning_agent import get_lesson_plan
