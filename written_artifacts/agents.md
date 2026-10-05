@@ -28,3 +28,33 @@ in: prompt for what we want to learn
 
 ### Artifacts of Compilation
 - Lesson Pages inside Application
+
+## Agent workflow
+
+```mermaid
+flowchart TD
+    U[User request] --> I[Intake Agent]
+    I -->|LearningRequest: new topic| R[Research Manager - planned]
+    I -->|LearningRequest: lesson question| T[Tutor Agent]
+
+    subgraph Research
+        R --> P[Topic Planner - planned]
+        P --> W[Web Search Agent]
+        W -->|candidate articles| J[Relevance Judge]
+        J -->|kept articles| S[Summarizer]
+        S --> C[Critic and roadmap]
+        C --> L[Lesson compilation]
+        W -. uses .-> WS[WebSearchTool]
+        S -. uses .-> WS
+    end
+
+    L --> V[(Vetted lesson sources / vector store)]
+    V -->|lesson-specific search| F[FileSearchTool]
+    T --> F
+    F --> A[Grounded answer with citations]
+    A --> U
+```
+
+The intended handoffs use typed data: Intake returns a `LearningRequest`; web search returns candidate title/URL/snippet results; the summarizer returns article summaries; and the tutor returns an `Answer` with citations. Web search and summarization use `WebSearchTool`; tutoring searches the selected lesson's vector store with `FileSearchTool`.
+
+**Implementation status:** Intake, web search, summarizer, and tutor agents are defined. The research manager and topic planner are still placeholders, and the end-to-end routing, article filtering, storage, and research-to-compilation handoffs are not wired yet. The diagram shows the target workflow, not a currently running pipeline.
