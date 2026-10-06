@@ -1,7 +1,6 @@
 from agents import Agent, Runner, trace
 
 from pathwiseagenticassistant.agents.compilation.ui_component import UIComponent
-from pathwiseagenticassistant.schemas import ResearchPack
 
 # Overview Description: Writes the lesson content in the user's stack and tone
 
@@ -61,12 +60,13 @@ lesson_writing_agent = Agent(
 )
 
 async def write_lesson(
-    research_pack: ResearchPack,
+    topic: str,
     lesson_plan: str,
+    lesson_resources: str,
     previous_draft: UIComponent | None = None,
     feedback: str | None = None,
 ) -> UIComponent:
-    prompt = f"Topic: {research_pack.topic}\n\nLesson Plan:\n{lesson_plan}\n\nLesson Resources:\n{research_pack.summaries}"
+    prompt = f"Topic: {topic}\n\nLesson Plan:\n{lesson_plan}\n\nLesson Resources:\n{lesson_resources}"
     if previous_draft is not None:
         prompt += f"\n\nPrevious Draft (revise this, keep what works):\n{previous_draft.model_dump_json()}"
     if feedback:

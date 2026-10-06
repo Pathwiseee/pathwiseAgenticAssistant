@@ -4,7 +4,7 @@ import gradio as gr
 from agents import Agent, Runner
 
 from pathwiseagenticassistant.agents.compilation.ui_component import CONTAINER_TYPES, UIComponent
-from pathwiseagenticassistant.schemas import PageReview, PageVerification, ResearchPack
+from pathwiseagenticassistant.schemas import PageReview, PageVerification
 from pathwiseagenticassistant.ui.components import render
 
 # Overview Description: Checks the page has every required section, renders, and has no unsafe script
@@ -93,12 +93,12 @@ def check_structure(lesson: UIComponent) -> list[str]:
     return issues
 
 
-async def verify_page(research_pack: ResearchPack, lesson_plan: str, lesson: UIComponent) -> PageVerification:
+async def verify_page(topic: str, lesson_plan: str, lesson: UIComponent) -> PageVerification:
     structural_issues = check_structure(lesson)
     if structural_issues:
         # Don't spend an LLM call reviewing content of a page that needs rewriting anyway
         return PageVerification(structural_issues=structural_issues, review=None)
 
-    prompt = f"Topic: {research_pack.topic}\n\nLesson Plan:\n{lesson_plan}\n\nLesson:\n{lesson.model_dump_json()}"
+    prompt = f"Topic: {topic}\n\nLesson Plan:\n{lesson_plan}\n\nLesson:\n{lesson.model_dump_json()}"
     result = await Runner.run(page_verifier_agent, prompt)
     return PageVerification(structural_issues=[], review=result.final_output)

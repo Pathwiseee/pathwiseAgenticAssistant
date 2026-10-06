@@ -1,6 +1,6 @@
 from agents import Agent, Runner
 
-from pathwiseagenticassistant.schemas import LessonReview, ResearchPack
+from pathwiseagenticassistant.schemas import LessonReview
 
 # Overview Description: Sets learning goals, preconditions and postconditions for one step
 
@@ -48,7 +48,7 @@ lesson_reviewer_agent = Agent(
     output_type=LessonReview,
 )
 
-async def review_lesson_plan(research_pack: ResearchPack, lesson_plan: str) -> LessonReview:
-    prompt = f"Topic: {research_pack.topic}\n\nLesson Plan:\n{lesson_plan}\n\nLesson Resources:\n{research_pack.summaries}"
+async def review_lesson_plan(topic: str, lesson_plan: str, lesson_resources: str) -> LessonReview:
+    prompt = f"Topic: {topic}\n\nLesson Plan:\n{lesson_plan}\n\nLesson Resources:\n{lesson_resources}"
     result = await Runner.run(lesson_reviewer_agent, prompt)
     return result.final_output

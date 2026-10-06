@@ -110,7 +110,6 @@ class PageVerification(BaseModel):
 
 class CompiledLesson(BaseModel):
     research_pack: ResearchPack
-    lesson_plan: str
     reviews: list[LessonReview] = Field(default_factory=list)
     lesson: UIComponent
     verifications: list[PageVerification] = Field(default_factory=list)

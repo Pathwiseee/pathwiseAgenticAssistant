@@ -2,11 +2,11 @@ from collections.abc import AsyncIterator
 from agents import trace
 
 from pathwiseagenticassistant.agents.compilation.lesson_planning_agent import get_lesson_plan
-from pathwiseagenticassistant.agents.compilation.lesson_reviewer_agent import review_lesson_plan
+from pathwiseagenticassistant.agents.compilation.lesson_reviewer_agent import LessonReview, review_lesson_plan
 from pathwiseagenticassistant.agents.compilation.lesson_writing_agent import write_lesson
-from pathwiseagenticassistant.agents.compilation.page_verifier_agent import verify_page
+from pathwiseagenticassistant.agents.compilation.page_verifier_agent import PageVerification, verify_page
 from pathwiseagenticassistant.agents.compilation.ui_component import UIComponent
-from pathwiseagenticassistant.schemas import CompilationEvent, CompiledLesson, LessonReview, PageVerification, ResearchPack
+from pathwiseagenticassistant.schemas import CompilationEvent, CompiledLesson, ResearchPack
 
 # Overview Description: Runs the compilation module end to end for one lesson
 #
@@ -21,7 +21,7 @@ from pathwiseagenticassistant.schemas import CompilationEvent, CompiledLesson, L
 # Both loops are bounded so a picky reviewer/verifier can't spin forever;
 # if revisions run out, the last draft is returned with verified=False.
 
-#Input: ResearchPack (from the research module)
+#Input: topic, lesson resources (from the research module)
 #Output: stream of CompilationEvents, the last one carrying the CompiledLesson
 
 
@@ -52,10 +52,10 @@ async def compile_lesson_stream(
         for attempt in range(max_write_revisions + 1):
             yield CompilationEvent(stage="writing", message=f"Writing lesson (draft {attempt + 1})")
             feedback = verifications[-1].feedback() if verifications else None
-            lesson = await write_lesson(research_pack, lesson_plan, lesson, feedback)
+            lesson = await write_lesson(research_pack.topic, lesson_plan, research_pack.summaries, lesson, feedback)
 
             yield CompilationEvent(stage="verifying", message=f"Verifying lesson (draft {attempt + 1})")
-            verification = await verify_page(research_pack, lesson_plan, lesson)
+            verification = await verify_page(research_pack.topic, lesson_plan, lesson)
             verifications.append(verification)
             if verification.passed:
                 break
