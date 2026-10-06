@@ -121,7 +121,7 @@ class CompiledLesson(BaseModel):
 
 
 class CompilationEvent(BaseModel):
-    stage: Literal["planning", "reviewing", "writing", "verifying", "done"]
+    stage: Literal["intake", "researching", "planning", "reviewing", "writing", "verifying", "done"]
     message: str
     result: CompiledLesson | None = None  # only set on the "done" event
 

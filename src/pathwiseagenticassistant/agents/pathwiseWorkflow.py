@@ -1,50 +1,52 @@
-from agents import trace
+from collections.abc import AsyncIterator
 
-async def compile_lesson_stream(
+from pathwiseagenticassistant.agents.compilation.compilation_orchestrator import compile_lesson_stream
+from pathwiseagenticassistant.agents.front_door.intake_agent import intake_user_request
+from pathwiseagenticassistant.agents.research.research_manager import ResearchManager
+from pathwiseagenticassistant.schemas import CompilationEvent, CompiledLesson
+from pathwiseagenticassistant.tools.summarizer import summarizer_agent
+from pathwiseagenticassistant.tools.web_search_agent import web_search_agent
+
+# Overview Description: Runs the whole Pathwise pipeline for one user request
+#
+#   intake agent ──> research manager ──> compilation orchestrator ──> CompiledLesson
+#   (LearningRequest)   (ResearchPack)       (CompilationEvents)
+#
+# Each sub-workflow opens its own trace, so this orchestrator only sequences them
+# and forwards their progress as one event stream.
+
+#Input: topic + free-text user request
+#Output: stream of CompilationEvents, the last one carrying the CompiledLesson
+
+
+async def run_pathwise_stream(
+    topic: str,
     user_request: str,
-) :
-    with trace("lesson_compilation"):
-        yield CompilationEvent(stage="planning", message="Intake Agent")
-        lesson_plan = await get_lesson_plan(research_pack)
+    max_plan_revisions: int = 1,
+    max_write_revisions: int = 1,
+) -> AsyncIterator[CompilationEvent]:
+    yield CompilationEvent(stage="intake", message="Understanding your learning request")
+    request = await intake_user_request(topic, user_request)
+    yield CompilationEvent(
+        stage="intake",
+        message=f"Learning {request.topic} ({request.level.value}, {request.tech_stack}) for: {request.goal}",
+    )
 
-        reviews: list[LessonReview] = []
-        for attempt in range(max_plan_revisions + 1):
-            yield CompilationEvent(stage="reviewing", message=f"Reviewing lesson plan (round {attempt + 1})")
-            review = await review_lesson_plan(research_pack, lesson_plan)
-            reviews.append(review)
-            if review.approved or attempt == max_plan_revisions:
-                break
-            # Only blocking issues drive a revision; suggestions would keep expanding the plan's scope
-            yield CompilationEvent(stage="planning", message="Revising lesson plan to fix blocking issues")
-            blocking = "\n".join(f"- {issue}" for issue in review.blocking_issues)
-            lesson_plan = await get_lesson_plan(research_pack, lesson_plan, blocking)
+    # Research takes a few minutes and has no event stream, so it reports start and finish only
+    yield CompilationEvent(stage="researching", message="Gathering and summarizing sources")
+    research_pack = await ResearchManager(web_search_agent, summarizer_agent).run(request)
+    yield CompilationEvent(stage="researching", message=f"Found {len(research_pack.summaries)} sources")
 
-        lesson: UIComponent | None = None
-        verifications: list[PageVerification] = []
-        for attempt in range(max_write_revisions + 1):
-            yield CompilationEvent(stage="writing", message=f"Writing lesson (draft {attempt + 1})")
-            feedback = verifications[-1].feedback() if verifications else None
-            lesson = await write_lesson(research_pack, lesson_plan, lesson, feedback)
-
-            yield CompilationEvent(stage="verifying", message=f"Verifying lesson (draft {attempt + 1})")
-            verification = await verify_page(research_pack, lesson_plan, lesson)
-            verifications.append(verification)
-            if verification.passed:
-                break
-
-        result = CompiledLesson(
-            research_pack=research_pack,
-            lesson_plan=lesson_plan,
-            reviews=reviews,
-            lesson=lesson,
-            verifications=verifications,
-        )
-        status = "verified" if result.verified else "returned unverified (revisions exhausted)"
-        yield CompilationEvent(stage="done", message=f"Lesson {status}", result=result)
+    async for event in compile_lesson_stream(
+        research_pack,
+        max_plan_revisions=max_plan_revisions,
+        max_write_revisions=max_write_revisions,
+    ):
+        yield event
 
 
-async def compile_lesson(research_pack: ResearchPack, **kwargs) -> CompiledLesson:
-    async for event in compile_lesson_stream(research_pack, **kwargs):
+async def run_pathwise(topic: str, user_request: str, **kwargs) -> CompiledLesson:
+    async for event in run_pathwise_stream(topic, user_request, **kwargs):
         if event.result is not None:
             return event.result
-    raise RuntimeError("compilation ended without a result")
+    raise RuntimeError("workflow ended without a result")

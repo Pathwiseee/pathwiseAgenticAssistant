@@ -35,7 +35,7 @@ intake_agent = Agent(
 async def intake_user_request(
     topic: str,
     user_prompt: str
-) -> str:
+) -> LearningRequest:
     prompt = f"Topic: {topic}, User Prompt: {user_prompt}"
     result = await Runner.run(intake_agent, prompt)
     return result.final_output
