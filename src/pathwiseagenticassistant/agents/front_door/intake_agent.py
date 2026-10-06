@@ -1,4 +1,4 @@
-from agents import Agent
+from agents import Agent, Runner
 from pathwiseagenticassistant.schemas import LearningRequest
 
 INSTRUCTIONS = """You are Pathwise's intake agent. Your role is to understand what the user wants to learn and prepare a structured learning request.
@@ -21,7 +21,6 @@ INSTRUCTIONS = """You are Pathwise's intake agent. Your role is to understand wh
 **Important:**
 - Be conversational but thorough - gather all needed context
 - If any field is ambiguous, ask the user to clarify
-- Default format to 'html' if not specified
 - Route 'research' for new topics, 'tutor' for questions about an existing lesson
 - Keep responses brief - you are an intake form, not a tutor"""
 
@@ -31,3 +30,12 @@ intake_agent = Agent(
     model="gpt-5-mini",
     output_type=LearningRequest,
 )
+
+
+async def intake_user_request(
+    topic: str,
+    user_prompt: str
+) -> str:
+    prompt = f"Topic: {topic}, User Prompt: {user_prompt}"
+    result = await Runner.run(intake_agent, prompt)
+    return result.final_output
