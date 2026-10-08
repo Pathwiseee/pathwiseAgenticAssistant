@@ -1,7 +1,6 @@
 import gradio as gr
 from dotenv import load_dotenv
 
-from pathwiseagenticassistant.agents.compilation.ui_component import UIComponent
 from pathwiseagenticassistant.agents.pathwiseWorkflow import research_and_compile_stream
 from pathwiseagenticassistant.schemas import CompiledLesson, LearningRequest, LevelEnum
 from pathwiseagenticassistant.ui.components import render
@@ -34,23 +33,40 @@ def format_verifications(compiled: CompiledLesson) -> str:
     return "\n\n---\n\n".join(sections)
 
 
+def lesson_panel() -> gr.State:
+    """Plan, reviews, verification and the interactive lesson.
+
+    Set the returned state to a CompiledLesson dump (or None to clear) to show it.
+    Must be called inside a gr.Blocks() context.
+    """
+    lesson_state = gr.State(None)
+
+    # Re-runs every time lesson_state changes, rebuilding the lesson UI
+    @gr.render(inputs=lesson_state)
+    def render_lesson(lesson):
+        if lesson is None:
+            return
+        compiled = CompiledLesson.model_validate(lesson)
+        with gr.Accordion("Lesson Plan", open=False):
+            gr.Markdown(compiled.lesson_plan)
+        with gr.Accordion("Plan Reviews", open=False):
+            gr.Markdown(format_reviews(compiled))
+        with gr.Accordion("Page Verification", open=False):
+            gr.Markdown(format_verifications(compiled))
+        render(compiled.lesson)
+
+    return lesson_state
+
+
 def build_lesson_ui() -> gr.Blocks:
     with gr.Blocks() as demo:
-        lesson_state = gr.State(None)
-
         topic = gr.Textbox(label="Topic")
         level = gr.Dropdown([l.value for l in LevelEnum], value=LevelEnum.INTERMEDIATE.value, label="Level")
         tech_stack = gr.Textbox(label="Tech Stack")
         goal = gr.Textbox(label="Goal")
         generate = gr.Button("Compile Lesson")
         status = gr.Markdown()
-
-        with gr.Accordion("Lesson Plan", open=False):
-            plan_md = gr.Markdown()
-        with gr.Accordion("Plan Reviews", open=False):
-            reviews_md = gr.Markdown()
-        with gr.Accordion("Page Verification", open=False):
-            verification_md = gr.Markdown()
+        lesson_state = lesson_panel()
 
         async def generate_lesson(topic, level, tech_stack, goal):
             log = []
@@ -60,27 +76,9 @@ def build_lesson_ui() -> gr.Blocks:
                 if event.result is None:
                     yield {status: "\n".join(log)}
                     continue
-                compiled = event.result
-                yield {
-                    status: "\n".join(log),
-                    plan_md: compiled.lesson_plan,
-                    reviews_md: format_reviews(compiled),
-                    verification_md: format_verifications(compiled),
-                    lesson_state: compiled.lesson.model_dump(),
-                }
+                yield {status: "\n".join(log), lesson_state: event.result.model_dump()}
 
-        generate.click(
-            generate_lesson,
-            inputs=[topic, level, tech_stack, goal],
-            outputs=[status, plan_md, reviews_md, verification_md, lesson_state],
-        )
-
-        # Re-runs every time lesson_state changes, rebuilding the lesson UI
-        @gr.render(inputs=lesson_state)
-        def render_lesson(lesson):
-            if lesson is None:
-                return
-            render(UIComponent.model_validate(lesson))
+        generate.click(generate_lesson, inputs=[topic, level, tech_stack, goal], outputs=[status, lesson_state])
 
     return demo
 

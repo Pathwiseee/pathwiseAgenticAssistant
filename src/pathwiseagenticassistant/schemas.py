@@ -27,6 +27,9 @@ class LearningRequest(BaseModel):
     tech_stack: str = Field(description="User's primary tech stack (e.g., 'Java/Spring', 'Python/Django')")
     goal: str = Field(description="Learning purpose: job, project, exam, or general knowledge")
 
+    def summary(self) -> str:
+        return f"Learning {self.topic} ({self.level.value}, {self.tech_stack}) for: {self.goal}"
+
 
 # Research
 
@@ -59,6 +62,10 @@ class Answer(BaseModel):
     """Grounded answer from Tutor Agent"""
     answer: str = Field(description="The tutor's answer, grounded in the lesson and its sources")
     sources: list[Source] = Field(default_factory=list, description="Lesson sources cited in the answer; empty if none were used")
+
+    def as_markdown(self) -> str:
+        links = ", ".join(f"[{s.title}]({s.url})" for s in self.sources)
+        return f"{self.answer}\n\n**Sources:** {links}" if links else self.answer
 
 # Search Agent
 

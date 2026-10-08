@@ -18,8 +18,8 @@ Run Pathwise as a local, single-user Gradio app:
 | Input/output guardrails | Done | `guardrails.py` |
 | Research + compilation pipeline | Done | `agents/pathwiseWorkflow.py` |
 | Chat service (one call per user message) | Done | `chat/chat_service.py` |
-| Chat history for display | **Next** | `storage/db.py` |
-| Chat UI | **Next** | `ui/app.py` |
+| Chat history for display | Done | `storage/db.py` |
+| Chat UI | Done (tested in a browser with a stubbed chat service; not yet against the real API) | `ui/app.py` |
 | Intake clarifying questions | Open | see Open Questions |
 
 Everything below the UI is tested offline with stubbed agents, not yet against the real API.

@@ -76,10 +76,7 @@ async def _intake_then_build_lesson(
     except InputGuardrailTripwireTriggered as e:
         yield _blocked_reply(e)
         return
-    yield ChatEvent(
-        kind="status",
-        message=f"Learning {request.topic} ({request.level.value}, {request.tech_stack}) for: {request.goal}",
-    )
+    yield ChatEvent(kind="status", message=request.summary())
 
     # No session past this point: research/compilation prompts stay out of the chat history
     async for event in research_and_compile_stream(request, max_plan_revisions, max_write_revisions):

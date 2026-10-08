@@ -1,3 +1,4 @@
+import json
 import sqlite3
 import uuid
 from pathlib import Path
@@ -5,7 +6,7 @@ from pathlib import Path
 from agents import SQLiteSession
 from pydantic import BaseModel
 
-from pathwiseagenticassistant.schemas import CompiledLesson
+from pathwiseagenticassistant.schemas import Answer, CompiledLesson, LearningRequest
 
 # Overview Description: Local storage for chats and compiled lessons
 #
@@ -84,6 +85,12 @@ def get_chat(chat_id: str) -> Chat:
     return Chat(**dict(row))
 
 
+def get_chat_for_lesson(lesson_id: str) -> Chat | None:
+    with _connect() as conn:
+        row = conn.execute("SELECT * FROM chats WHERE lesson_id = ?", (lesson_id,)).fetchone()
+    return Chat(**dict(row)) if row else None
+
+
 def attach_lesson_to_chat(chat_id: str, lesson_id: str) -> None:
     with _connect() as conn:
         conn.execute("UPDATE chats SET lesson_id = ? WHERE id = ?", (lesson_id, chat_id))
@@ -91,6 +98,24 @@ def attach_lesson_to_chat(chat_id: str, lesson_id: str) -> None:
 
 def get_chat_session(chat_id: str) -> SQLiteSession:
     return SQLiteSession(chat_id, DB_PATH)
+
+
+async def get_chat_messages(chat_id: str) -> list[dict[str, str]]:
+    """The chat as {role, content} messages for gr.Chatbot.
+
+    The session stores what the model saw, not what the user saw: intake prompts carry a
+    "Topic: ..." prefix and agent replies are JSON (LearningRequest or Answer).
+    """
+    intake_prefix = f"Topic: {get_chat(chat_id).topic}, User Prompt: "  # as built by intake_user_request
+    messages = []
+    for item in await get_chat_session(chat_id).get_items():
+        if item.get("role") == "user":
+            messages.append({"role": "user", "content": item["content"].removeprefix(intake_prefix)})
+        elif item.get("role") == "assistant":  # reasoning and tool items have no role
+            reply = json.loads(item["content"][0]["text"])
+            text = Answer(**reply).as_markdown() if "answer" in reply else LearningRequest(**reply).summary()
+            messages.append({"role": "assistant", "content": text})
+    return messages
 
 
 # ---------- lessons ----------
