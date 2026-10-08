@@ -5,7 +5,7 @@ from agents import SQLiteSession
 from pathwiseagenticassistant.agents.compilation.compilation_orchestrator import compile_lesson_stream
 from pathwiseagenticassistant.agents.front_door.intake_agent import intake_user_request
 from pathwiseagenticassistant.agents.research.research_manager import ResearchManager
-from pathwiseagenticassistant.schemas import CompilationEvent, CompiledLesson
+from pathwiseagenticassistant.schemas import CompilationEvent, CompiledLesson, LearningRequest
 from pathwiseagenticassistant.tools.summarizer import summarizer_agent
 from pathwiseagenticassistant.tools.web_search_agent import web_search_agent
 
@@ -36,7 +36,17 @@ async def run_pathwise_stream(
         stage="intake",
         message=f"Learning {request.topic} ({request.level.value}, {request.tech_stack}) for: {request.goal}",
     )
+    async for event in research_and_compile_stream(request, max_plan_revisions, max_write_revisions):
+        yield event
 
+
+#Input: LearningRequest already produced by intake (e.g. by chat_service.respond_to_message)
+#Output: stream of CompilationEvents, the last one carrying the CompiledLesson
+async def research_and_compile_stream(
+    request: LearningRequest,
+    max_plan_revisions: int = 1,
+    max_write_revisions: int = 1,
+) -> AsyncIterator[CompilationEvent]:
     # Research takes a few minutes and has no event stream, so it reports start and finish only
     yield CompilationEvent(stage="researching", message="Gathering and summarizing sources")
     research_pack = await ResearchManager(web_search_agent, summarizer_agent).run(request)

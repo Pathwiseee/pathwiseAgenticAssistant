@@ -12,3 +12,6 @@ wheels/
 
 # .env
 .env
+
+# Local chat/lesson database
+data/
