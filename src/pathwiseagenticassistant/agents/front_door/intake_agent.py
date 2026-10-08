@@ -1,3 +1,5 @@
+from agents import Agent, Runner
+from pathwiseagenticassistant.guardrails import make_input_guardrail
 from agents import Agent, Runner, SQLiteSession
 from pathwiseagenticassistant.schemas import LearningRequest
 
@@ -29,6 +31,7 @@ intake_agent = Agent(
     instructions=INSTRUCTIONS,
     model="gpt-5-mini",
     output_type=LearningRequest,
+    input_guardrails=[make_input_guardrail("requests to learn a technology, framework or programming concept")],
 )
 
 
