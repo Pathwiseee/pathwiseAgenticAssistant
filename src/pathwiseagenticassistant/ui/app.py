@@ -73,7 +73,8 @@ def build_app() -> gr.Blocks:
 
         async def start_chat(topic: str) -> dict:
             if not topic.strip():
-                raise gr.Error("Enter a topic for the new chat first.")
+                gr.Warning("Enter a topic for the new chat first.")
+                return gr.skip()
             return await show_chat(create_chat(topic.strip()))
 
         async def open_lesson(lesson_id: str) -> dict:
@@ -85,9 +86,9 @@ def build_app() -> gr.Blocks:
             return await show_chat(chat.id)
 
         async def send(message: str, chat_id: str | None, history: list[dict]):
-            if chat_id is None:
-                raise gr.Error("Start a new chat or pick one first.")
-            if not message.strip():
+            if chat_id is None or not message.strip():
+                gr.Warning("Start or pick a chat, then type a message.")
+                yield gr.skip()  # a bare return would reset every output to None
                 return
             history = [*history, _message("user", message)]
             yield {**set_locked(True), msg: gr.Textbox(value="", interactive=False), chatbot: history}
