@@ -1,4 +1,5 @@
 from agents import Agent, FileSearchTool
+from pathwiseagenticassistant.guardrails import make_input_guardrail
 from pathwiseagenticassistant.schemas import Answer
 
 INSTRUCTIONS = """You are Pathwise's tutor agent. Your role is to answer student questions about a specific lesson using only the lesson's vetted sources.
@@ -18,6 +19,9 @@ INSTRUCTIONS = """You are Pathwise's tutor agent. Your role is to answer student
 - Be concise but thorough - adapt complexity to what a learner at their level would understand
 - Correct any misconceptions gently with source-backed explanation"""
 
+tutor_input_guardrail = make_input_guardrail("questions about a software technology or programming concept being studied")
+
+
 def create_tutor_agent(vector_store_id: str) -> Agent:
     """Build a Tutor Agent scoped to one lesson's vector store.
 
@@ -31,4 +35,5 @@ def create_tutor_agent(vector_store_id: str) -> Agent:
         tools=[FileSearchTool(vector_store_ids=[vector_store_id])],
         model="gpt-5-mini",
         output_type=Answer,
+        input_guardrails=[tutor_input_guardrail],
     )

@@ -1,4 +1,5 @@
 from agents import Agent, Runner
+from pathwiseagenticassistant.guardrails import make_input_guardrail
 from pathwiseagenticassistant.schemas import LearningRequest
 
 INSTRUCTIONS = """You are Pathwise's intake agent. Your role is to understand what the user wants to learn and prepare a structured learning request.
@@ -29,6 +30,7 @@ intake_agent = Agent(
     instructions=INSTRUCTIONS,
     model="gpt-5-mini",
     output_type=LearningRequest,
+    input_guardrails=[make_input_guardrail("requests to learn a technology, framework or programming concept")],
 )
 
 
