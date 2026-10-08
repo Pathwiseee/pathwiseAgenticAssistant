@@ -2,11 +2,8 @@ import gradio as gr
 from dotenv import load_dotenv
 
 from pathwiseagenticassistant.agents.compilation.ui_component import UIComponent
-from pathwiseagenticassistant.agents.compilation.compilation_orchestrator import compile_lesson_stream
-from pathwiseagenticassistant.agents.research.research_manager import ResearchManager
+from pathwiseagenticassistant.agents.pathwiseWorkflow import research_and_compile_stream
 from pathwiseagenticassistant.schemas import CompiledLesson, LearningRequest, LevelEnum
-from pathwiseagenticassistant.tools.summarizer import summarizer_agent
-from pathwiseagenticassistant.tools.web_search_agent import web_search_agent
 from pathwiseagenticassistant.ui.components import render
 
 
@@ -56,14 +53,9 @@ def build_lesson_ui() -> gr.Blocks:
             verification_md = gr.Markdown()
 
         async def generate_lesson(topic, level, tech_stack, goal):
-            # Research takes a few minutes and has no event stream, so show a single status line for it
-            log = ["- **researching**: Gathering and summarizing sources"]
-            yield {status: "\n".join(log)}
+            log = []
             request = LearningRequest(topic=topic, level=LevelEnum(level), tech_stack=tech_stack, goal=goal)
-            research_pack = await ResearchManager(web_search_agent, summarizer_agent).run(request)
-            log.append(f"- **researching**: Found {len(research_pack.summaries)} sources")
-
-            async for event in compile_lesson_stream(research_pack):
+            async for event in research_and_compile_stream(request):
                 log.append(f"- **{event.stage}**: {event.message}")
                 if event.result is None:
                     yield {status: "\n".join(log)}

@@ -51,10 +51,14 @@ class UserProfile(BaseModel):
     preferred_format: str = Field(default="html")
     preferred_tone: str = Field(default="technical", description="Tone preference: technical, casual, etc.")
 
+class Source(BaseModel):
+    title: str
+    url: str
+
 class Answer(BaseModel):
     """Grounded answer from Tutor Agent"""
-    answer: str = Field(description="The tutor's answer, grounded in lesson sources")
-    lesson_id: str = Field(description="ID of the lesson being tutored on")
+    answer: str = Field(description="The tutor's answer, grounded in the lesson and its sources")
+    sources: list[Source] = Field(default_factory=list, description="Lesson sources cited in the answer; empty if none were used")
 
 # Search Agent
 
