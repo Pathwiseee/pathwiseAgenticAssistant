@@ -1,5 +1,7 @@
 from collections.abc import AsyncIterator
 
+from agents import SQLiteSession
+
 from pathwiseagenticassistant.agents.compilation.compilation_orchestrator import compile_lesson_stream
 from pathwiseagenticassistant.agents.front_door.intake_agent import intake_user_request
 from pathwiseagenticassistant.agents.research.research_manager import ResearchManager
@@ -24,9 +26,12 @@ async def run_pathwise_stream(
     user_request: str,
     max_plan_revisions: int = 1,
     max_write_revisions: int = 1,
+    session: SQLiteSession | None = None,
 ) -> AsyncIterator[CompilationEvent]:
+    # Only intake sees the chat session; research/compilation stay stateless so
+    # their internal prompts never land in the user's chat history
     yield CompilationEvent(stage="intake", message="Understanding your learning request")
-    request = await intake_user_request(topic, user_request)
+    request = await intake_user_request(topic, user_request, session)
     yield CompilationEvent(
         stage="intake",
         message=f"Learning {request.topic} ({request.level.value}, {request.tech_stack}) for: {request.goal}",
