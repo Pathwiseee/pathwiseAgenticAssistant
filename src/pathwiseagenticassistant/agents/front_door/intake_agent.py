@@ -1,4 +1,4 @@
-from agents import Agent, Runner
+from agents import Agent, Runner, SQLiteSession
 from pathwiseagenticassistant.schemas import LearningRequest
 
 INSTRUCTIONS = """You are Pathwise's intake agent. Your role is to understand what the user wants to learn and prepare a structured learning request.
@@ -34,8 +34,9 @@ intake_agent = Agent(
 
 async def intake_user_request(
     topic: str,
-    user_prompt: str
+    user_prompt: str,
+    session: SQLiteSession | None = None,
 ) -> LearningRequest:
     prompt = f"Topic: {topic}, User Prompt: {user_prompt}"
-    result = await Runner.run(intake_agent, prompt)
+    result = await Runner.run(intake_agent, prompt, session=session)
     return result.final_output
