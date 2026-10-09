@@ -2,6 +2,8 @@ import logging
 
 import gradio as gr
 
+from agents import InputGuardrailTripwireTriggered
+from pathwiseagenticassistant.agents.front_door.help_agent import ask_help
 from pathwiseagenticassistant.chat.chat_service import respond_to_message
 from pathwiseagenticassistant.schemas import Answer
 from pathwiseagenticassistant.storage.db import (
@@ -50,6 +52,23 @@ def build_app() -> gr.Blocks:
                 show_lesson = gr.Checkbox(label="Show lesson")
             with gr.Column(scale=3, visible=False) as lesson_column:
                 lesson_state = lesson_panel()
+
+        with gr.Accordion("Help: ask about Pathwise", open=False):
+            help_question = gr.Textbox(show_label=False, placeholder="e.g. How long does a lesson take?", submit_btn=True)
+            help_answer = gr.Markdown()
+
+        async def ask_help_ui(question: str) -> str:
+            if not question.strip():
+                return "Type a question about Pathwise first."
+            try:
+                return await ask_help(question)
+            except InputGuardrailTripwireTriggered as e:
+                return e.guardrail_result.output.output_info.reason
+            except Exception:
+                logger.exception("Help agent failed")
+                return "⚠️ Something went wrong. Please try again."
+
+        help_question.submit(ask_help_ui, help_question, help_answer)
 
         view = [active_chat, chats, lessons, chatbot, lesson_state]
         controls = [msg, topic, new_chat, chats, lessons]  # locked while a message is being answered

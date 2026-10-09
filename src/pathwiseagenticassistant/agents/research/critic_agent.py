@@ -22,9 +22,14 @@ You will receive:
 - notes about each article found (title, key points, subtopics covered)
 
 Your tasks:
-1. For each planned subtopic, check whether at least one article covers it
-   (same meaning counts, even if the words differ).
-   List the uncovered ones in missing_subtopics.
+1. For each planned subtopic, read the KEY POINTS and the "covers" list of EVERY article.
+   A subtopic is COVERED if at least one article explains it or clearly mentions it,
+   even in different words. Examples:
+   - "producers write to topics, consumers read" covers "Producers and Consumers"
+   - "built on durable, partitioned logs" covers "Topics and Partitions"
+   - "distributed across machines, brokers replicate data" covers "Architecture"
+   Put a subtopic in missing_subtopics ONLY if no article mentions it at all.
+   When unsure, treat it as covered.
 2. List any contradictions between articles in contradictions.
 3. For each missing subtopic, write one short web search query (under 12 words,
    including the topic name) in follow_up_queries.
