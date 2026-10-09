@@ -7,32 +7,49 @@ Run Pathwise as a local, single-user Gradio app:
 - Chats are stored in a local SQLite database.
 - Each chat has its own tutor memory.
 - Compiled lessons live in a lesson directory and can be opened from there; the lesson view is optional and can stay hidden.
+- A help box answers questions about Pathwise itself from an FAQ.
 
 ## Status
 
+_Last updated 2026-10-09 (up to commit `a0f494c`)._
+
 | Part | Status | Where |
 |---|---|---|
-| Storage (chats, lessons, sessions) | Done | `storage/db.py` |
+| Storage (chats, lessons, sessions, chat history for display) | Done | `storage/db.py` |
 | Intake with chat session | Done | `agents/front_door/intake_agent.py` |
 | Tutor grounded in lesson + research pack | Done | `agents/front_door/tutor_agent.py` |
 | Input/output guardrails | Done | `guardrails.py` |
+| Research (searches, judging, summaries run in parallel) | Done | `agents/research/research_manager.py` |
 | Research + compilation pipeline | Done | `agents/pathwiseWorkflow.py` |
 | Chat service (one call per user message) | Done | `chat/chat_service.py` |
-| Chat history for display | Done | `storage/db.py` |
-| Chat UI | Done (tested in a browser with a stubbed chat service; not yet against the real API) | `ui/app.py` |
+| Chat UI | Done | `ui/app.py` |
+| Lesson panel (shared by chat UI and dev form) | Done | `ui/renderer.py` → `lesson_panel()` |
+| Help box (RAG over the FAQ) | Done, needs one-time setup | `agents/front_door/help_agent.py`, `knowledge/pathwise_faq.md` |
+| Entry point | Done | `uv run pathwiseagenticassistant` → `ui/app.py` |
+| **First real end-to-end run** | **Next** | see Next Steps |
 | Intake clarifying questions | Open | see Open Questions |
 
-Everything below the UI is tested offline with stubbed agents, not yet against the real API.
+**Testing so far:** the chat UI was tested in a browser with a stubbed chat service. Everything below it was tested offline with stubbed agents. Nothing has run end to end against the real API yet.
+
+## How to Run
+
+1. `.env` needs `OPENAI_API_KEY`.
+2. Help box only, once: `uv run python scripts/build_faq_store.py`, then add the printed `PATHWISE_FAQ_VECTOR_STORE_ID=...` line to `.env`. (Not set in the local `.env` yet; until it is, the help box answers "Something went wrong".)
+3. `uv run pathwiseagenticassistant`
+4. Dev form for building one lesson without chats: `uv run python -m pathwiseagenticassistant.ui.renderer`
 
 ## Architecture
 
 ### Layers
 
 ```
-Gradio UI (ui/app.py)                          ← NEXT: only calls chat_service + storage
-   │  one call per user message
-   ▼
-chat_service.respond_to_message(chat_id, message)   ← owns SQLiteSession(chat_id)
+Gradio UI (ui/app.py)                    only calls chat_service, storage, ask_help
+   │                                        │
+   │ one call per user message              │ help box
+   ▼                                        ▼
+chat_service.respond_to_message         help_agent.ask_help(question)
+  (chat_id, message)                      FileSearchTool → FAQ vector store (OpenAI)
+  owns SQLiteSession(chat_id)             no session, no chat
    │                                   │
    │ chat has no lesson                │ chat has a lesson
    ▼                                   ▼
@@ -50,8 +67,9 @@ save_lesson + attach_lesson_to_chat
 ### Where the session lives
 
 - `SQLiteSession` is created per message by `respond_to_message`, one per chat (`session_id = chat_id`).
-- It is passed only to the agents that talk to the user: **intake** and **tutor**.
+- It is passed only to the agents that talk to the user in a chat: **intake** and **tutor**.
 - Research and compilation agents **never** receive the session. Their internal prompts would otherwise end up in the user's chat history and in the tutor's context.
+- The help agent has no session: each help question is answered on its own.
 - Agents stay stateless. A "tutor instance per chat" is `create_tutor_agent(lesson)` plus that chat's session, built again for each message.
 
 ### Chat ↔ lesson relationship
@@ -60,7 +78,7 @@ save_lesson + attach_lesson_to_chat
 - A new chat starts with intake. Intake runs the pipeline, which saves the lesson and attaches it to the chat. Messages after that go to the tutor.
 - Routing is by `chat.lesson_id`, not by intake, so `LearningRequest` does not need a `route` field.
 
-## Storage (done)
+## Storage
 
 A single file, `./data/pathwise.db` (git-ignored). `SQLiteSession` stores its message tables in the same file.
 
@@ -70,17 +88,19 @@ A single file, `./data/pathwise.db` (git-ignored). `SQLiteSession` stores its me
 | `lessons` | `id TEXT PK, topic TEXT, compiled_json TEXT, created_at` | `CompiledLesson.model_dump_json()` |
 | `agent_sessions`, `agent_messages` | managed by `SQLiteSession` | keyed by `chat_id` |
 
-`storage/db.py`: `init_db`, `create_chat(topic)`, `list_chats`, `get_chat`, `attach_lesson_to_chat`, `get_chat_session`, `save_lesson`, `list_lessons`, `get_lesson`.
+`storage/db.py`:
 
-## Chat Service (done)
+- Chats: `init_db`, `create_chat(topic)`, `list_chats`, `get_chat`, `get_chat_for_lesson`, `attach_lesson_to_chat`
+- Sessions: `get_chat_session`, `get_chat_messages` (session items turned into `{role, content}` for `gr.Chatbot`: strips the intake `Topic: ...` prefix, shows `Answer.as_markdown()` and `LearningRequest.summary()`)
+- Lessons: `save_lesson`, `list_lessons`, `get_lesson`
 
-`chat/chat_service.py` is the only thing the UI calls to run agents.
+## Chat Service
+
+`chat/chat_service.py` is the only thing the UI calls to run chat agents.
 
 ```python
 async def respond_to_message(chat_id: str, message: str) -> AsyncIterator[ChatEvent]
 ```
-
-It streams `ChatEvent`s:
 
 | `kind` | Meaning | Extra fields |
 |---|---|---|
@@ -90,75 +110,56 @@ It streams `ChatEvent`s:
 
 Status lines are **not** stored anywhere; they are only for the live view.
 
-## UI (next)
-
-The current `ui/renderer.py` is a one-shot form (topic/level/stack/goal → compile) with no chats or storage. It stays as a dev tool. The chat app is a new file, `ui/app.py`, that reuses its pieces.
+## UI (built)
 
 ### Layout
 
 ```
-┌──────────────┬───────────────────────────────────┬──────────────────────────┐
-│ SIDEBAR      │ CHAT                              │ LESSON PANEL (toggle)    │
-│              │                                   │                          │
-│ [+ New chat] │ you: I want to learn Kafka for    │ ▸ Kafka for Java/Spring  │
-│              │      my Spring job                │                          │
-│ Chats        │ ⏳ intake: Kafka (beginner, ...)   │  render(UIComponent)     │
-│ ● Kafka      │ ⏳ researching: 6 sources          │                          │
-│ ○ React hooks│ ⏳ writing: draft 1 ...            │ ▸ Plan / Reviews /       │
-│              │ ✅ Lesson verified → [Open lesson]│   Verification accordions│
-│ Lessons      │ you: what's a consumer group?     │                          │
-│ ▸ Kafka      │ tutor: ... [source: confluent.io] │                          │
-│ ▸ React hooks│                                   │                          │
-│              │ [ message box              ][Send]│                          │
-│              │ [Show lesson ☐]                   │                          │
-└──────────────┴───────────────────────────────────┴──────────────────────────┘
+┌──────────────────┬───────────────────────────────────┬──────────────────────────┐
+│ SIDEBAR          │ CHAT                              │ LESSON PANEL (toggle)    │
+│                  │                                   │                          │
+│ Topic for a new  │ you: I want to learn Kafka for    │ ▸ Lesson Plan            │
+│ chat: [Kafka   ] │      my Spring job                │ ▸ Plan Reviews           │
+│ [+ New chat]     │ ⏳ researching: Found 6 sources    │ ▸ Page Verification      │
+│                  │ Lesson ready. Tick 'Show lesson'  │                          │
+│ Chats            │ you: what's a consumer group?     │  render(UIComponent)     │
+│ ● Kafka          │ tutor: ... Sources: [confluent]   │                          │
+│ ○ React hooks    │                                   │                          │
+│                  │ [ Message                   ][➤] │                          │
+│ Lessons          │ [Show lesson ☐]                   │                          │
+│ ○ Kafka          │                                   │                          │
+├──────────────────┴───────────────────────────────────┴──────────────────────────┤
+│ ▸ Help: ask about Pathwise   [ e.g. How long does a lesson take?         ][➤]  │
+└─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Components
+### Behaviour
 
-- `gr.State`: `active_chat_id` only; everything else is read from SQLite.
-- `gr.Sidebar`: a "New chat" button, a chat list (`gr.Radio` over `list_chats()`) and a lesson directory (`gr.Radio` over `list_lessons()`).
-- `gr.Chatbot` + `gr.Textbox`: the send handler is an async generator over `respond_to_message`.
-- Lesson panel: `gr.Column(visible=False)`, toggled by a checkbox. Inside it, the existing `@gr.render` + `ui/components.render(UIComponent)` and the plan/review/verification accordions (`format_reviews`, `format_verifications` from `ui/renderer.py`).
+- `gr.State` holds only the active chat id; everything else is read from SQLite through `show_chat(chat_id)`.
+- **New chat:** needs the topic box filled (warns otherwise) → `create_chat(topic)`.
+- **Select chat:** `show_chat` loads history (`get_chat_messages`) and the linked lesson.
+- **Select lesson:** opens the chat linked to it (`get_chat_for_lesson`), or creates one if the lesson was saved but never attached.
+- **Send:** locks message box, topic, new chat and both lists while answering. `status` events show as one temporary `⏳` line; `answer` adds a bubble with sources; `lesson_ready` adds "Lesson ready" and reloads the sidebar and lesson panel. Any exception shows "⚠️ Something went wrong" and unlocks the controls.
+- **Help box:** `ask_help(question)`; a guardrail block shows its reason.
 
-### Events: what each one calls
+## Next Steps
 
-| Event | Calls | UI update |
-|---|---|---|
-| App start | `init_db()`, `list_chats()`, `list_lessons()` | Fill sidebar |
-| New chat | `create_chat(topic)` | Set `active_chat_id`, empty chatbot, refresh chat list |
-| Select chat | `get_chat(id)`, `get_chat_messages(id)`, `get_lesson(lesson_id)` if linked | Fill chatbot; fill lesson panel |
-| Select lesson | find its chat, or `create_chat(topic)` + `attach_lesson_to_chat` | Same as select chat |
-| Send | `respond_to_message(active_chat_id, text)` | See below |
+1. **First real end-to-end run** with `uv run pathwiseagenticassistant`: new chat → lesson built → tutor question → reopen the chat after restarting the app. Check in particular:
+   - the guardrail model name `gpt-6-luna` (`GUARDRAIL_MODEL` in `guardrails.py`) exists for this API key. If not, every guardrail fails closed and **every message is blocked**.
+   - `get_chat_messages` with real session items.
+   - research with the new parallel calls stays under the API rate limits.
+2. **Set up the FAQ store** (How to Run, step 2) and try the help box.
+3. **Intake clarifying questions** (Open Questions).
 
-**Send, per `ChatEvent`:**
+## Known Issues
 
-- Before streaming: append the user's message to the chatbot; disable the send button.
-- `status` → show as a temporary progress line under the user's message (replace it on each new status).
-- `answer` → append an assistant bubble; render `sources` as markdown links under it.
-- `lesson_ready` → append "Lesson ready" bubble, load `get_lesson(lesson_id)` into the lesson panel, refresh the lesson directory.
-- After streaming: re-enable the send button.
+- **Parallel research has no limit or error isolation.** `asyncio.gather` runs every search/judge/summary call at once, and one failure fails the whole research step. If rate limits show up, add an `asyncio.Semaphore`; consider `return_exceptions=True` and skipping failed articles.
+- **The help box needs a vector store id** that isn't in `.env` yet; `os.environ[...]` raises until it is (shown to the user as "Something went wrong").
 
-### Gaps to close before the UI works
+## Fixed
 
-1. **`get_chat_messages(chat_id)` in `storage/db.py`** (needed for "Select chat").
-   The session stores items for the model, not for display:
-   - User messages to intake are stored as `"Topic: X, User Prompt: ..."`.
-   - Intake and tutor replies are stored as JSON (`LearningRequest`, `Answer`).
-   `get_chat_messages` reads `get_chat_session(id).get_items()` and returns `[{role, content}]` for `gr.Chatbot`: strip the `Topic:` prefix, show `Answer.answer` (+ sources), turn a `LearningRequest` into "Learning Kafka (beginner, Java) for: job".
-2. **New chat needs a topic.** `create_chat(topic)` requires one. Simplest: a topic textbox next to "New chat". Alternative: create the chat on the first message and use that message as the topic.
-3. **Find the chat for a lesson** (needed for "Select lesson"): `get_chat_for_lesson(lesson_id) -> Chat | None` in `storage/db.py`.
-4. **Entry point:** point `main()` in `__init__.py` at `ui/app.py` so `uv run pathwiseagenticassistant` launches the chat app (it currently prints "Hello").
-
-## Build Order (remaining)
-
-1. `get_chat_messages`, `get_chat_for_lesson` in `storage/db.py`.
-2. `ui/app.py` skeleton: sidebar (new chat + chat list), chatbot, send → `respond_to_message`. Test with a chat that already has a lesson (tutor path) first, since it is fast.
-3. Compile path in the UI: status lines, `lesson_ready`, send button disabled while compiling.
-4. Lesson panel + accordions, moved over from `ui/renderer.py`.
-5. Lesson directory: select lesson → open or create its chat.
-6. `main()` entry point.
-7. First real end-to-end run against the API (check the guardrail model name `gpt-6-luna` works).
+- **Blocked messages no longer stay in the chat session** (2026-10-09). The SDK saves the user's message even when a guardrail blocks it, so the tutor would have read blocked text on the next message. `chat_service._forget_since` now rolls the session back to its length before the blocked run.
+- **`get_chat_messages` no longer breaks on unexpected items** (2026-10-09). Refusals and non-JSON replies are shown as plain text; items with no text are skipped.
 
 ## Open Questions
 

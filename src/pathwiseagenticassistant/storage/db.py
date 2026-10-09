@@ -109,13 +109,44 @@ async def get_chat_messages(chat_id: str) -> list[dict[str, str]]:
     intake_prefix = f"Topic: {get_chat(chat_id).topic}, User Prompt: "  # as built by intake_user_request
     messages = []
     for item in await get_chat_session(chat_id).get_items():
-        if item.get("role") == "user":
-            messages.append({"role": "user", "content": item["content"].removeprefix(intake_prefix)})
-        elif item.get("role") == "assistant":  # reasoning and tool items have no role
-            reply = json.loads(item["content"][0]["text"])
-            text = Answer(**reply).as_markdown() if "answer" in reply else LearningRequest(**reply).summary()
-            messages.append({"role": "assistant", "content": text})
+        role = item.get("role")  # reasoning and tool items have no role
+        if role == "user":
+            text = _item_text(item)
+            if text:
+                messages.append({"role": "user", "content": text.removeprefix(intake_prefix)})
+        elif role == "assistant":
+            text = _assistant_reply_text(item)
+            if text:
+                messages.append({"role": "assistant", "content": text})
     return messages
+
+
+def _item_text(item: dict) -> str:
+    """Text of a session item; content is either a string or a list of typed parts."""
+    content = item.get("content")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(part.get("text") or part.get("refusal", "") for part in content if isinstance(part, dict))
+    return ""
+
+
+def _assistant_reply_text(item: dict) -> str | None:
+    """An assistant reply as the user saw it, or None to skip it.
+
+    Replies are normally JSON (Answer or LearningRequest). Anything else, such as a
+    refusal or plain text, is shown as is rather than breaking the whole chat.
+    """
+    text = _item_text(item)
+    if not text:
+        return None
+    try:
+        reply = json.loads(text)
+        if "answer" in reply:
+            return Answer(**reply).as_markdown()
+        return LearningRequest(**reply).summary()
+    except (ValueError, TypeError):  # not JSON, not a dict, or doesn't fit either schema
+        return text
 
 
 # ---------- lessons ----------

@@ -53,9 +53,11 @@ async def respond_to_message(
 # ---------- steps ----------
 
 async def _answer_with_tutor(chat: Chat, message: str, session: SQLiteSession) -> AsyncIterator[ChatEvent]:
+    saved = len(await session.get_items())
     try:
         answer = await run_tutor_agent(get_lesson(chat.lesson_id), message, session)
     except (InputGuardrailTripwireTriggered, OutputGuardrailTripwireTriggered) as e:
+        await _forget_since(session, saved)
         yield _blocked_reply(e)
         return
     yield ChatEvent(kind="answer", message=answer.answer, sources=answer.sources)
@@ -71,9 +73,11 @@ async def _intake_then_build_lesson(
     yield ChatEvent(kind="status", message="Understanding your learning request")
     # TODO: intake always returns a LearningRequest today, so it can't ask a clarifying
     # question back; that needs a LearningRequest | ClarifyingQuestion output type
+    saved = len(await session.get_items())
     try:
         request = await intake_user_request(chat.topic, message, session)
     except InputGuardrailTripwireTriggered as e:
+        await _forget_since(session, saved)
         yield _blocked_reply(e)
         return
     yield ChatEvent(kind="status", message=request.summary())
@@ -91,3 +95,14 @@ async def _intake_then_build_lesson(
 def _blocked_reply(e: InputGuardrailTripwireTriggered | OutputGuardrailTripwireTriggered) -> ChatEvent:
     """Turn a tripped guardrail into a chat reply carrying the judge's user-safe reason."""
     return ChatEvent(kind="answer", message=e.guardrail_result.output.output_info.reason)
+
+
+async def _forget_since(session: SQLiteSession, saved: int) -> None:
+    """Drop what a blocked run added to the session.
+
+    The SDK still saves the user's message when a guardrail trips (and may save the blocked
+    answer), so without this the tutor would read blocked text, e.g. a prompt injection, on
+    the next message, and the reopened chat would show a message with no reply.
+    """
+    while len(await session.get_items()) > saved:
+        await session.pop_item()
