@@ -81,6 +81,20 @@ class SearchResults(BaseModel):
     results: list[SearchResult] = Field(description="Candidate articles found for the query")
 
 
+# Link Verifier
+
+class LinkVerification(BaseModel):
+    """Whether a link is real and its page supports the claim made about it"""
+    url: str
+    reachable: bool = Field(description="False if the page could not be fetched (dead, fake or erroring)")
+    matches_claim: bool = Field(description="True if the page content supports the claim about it")
+    reason: str = Field(description="One sentence explaining the verdict")
+
+    @property
+    def valid(self) -> bool:
+        return self.reachable and self.matches_claim
+
+
 
 # Compilation
 

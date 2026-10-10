@@ -1218,6 +1218,7 @@ source = { editable = "." }
 dependencies = [
     { name = "ddgs" },
     { name = "gradio" },
+    { name = "httpx" },
     { name = "openai-agents" },
     { name = "pydantic" },
     { name = "python-dotenv" },
@@ -1227,6 +1228,7 @@ dependencies = [
 requires-dist = [
     { name = "ddgs", specifier = ">=9.16.0" },
     { name = "gradio", specifier = ">=6.29.0" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "openai-agents", specifier = ">=0.22.3" },
     { name = "pydantic", specifier = ">=2.13.5" },
     { name = "python-dotenv", specifier = ">=1.2.4" },
